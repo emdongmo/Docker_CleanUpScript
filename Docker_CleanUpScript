@@ -1,0 +1,57 @@
+#!/bin/bash
+
+##-##-##-##-##-##-##-##-##-##-##-##-##-##-##-##-##-##-##-##-##-##-###-###
+##                                                                     ##
+##      Name of Script: Docker Cleaner                                 ##
+##      Author: Eric DONGMO                                            ##
+##       Alias: Doerma                                                 ##
+##       Email:                                                        ## 
+##       Date:Feb 2018                                                 ## 
+##       Description:this script will run a specific Docker command to ##
+##       perform task with following options.                          ##
+##                                                                     ##
+##-##-##-##-##-##-##-##-##-##-##-##-##-##-##-##-##-##-##-##-##-##-###-###
+
+# Options
+# Remove stopped containers and untagged images
+#   $ dockerleanup
+# Remove all stopped|running containers and untagged images
+#   $ dkcleanup --reset
+# Remove containers|images|tags matching {repository|image|repository\image|tag|image:tag}
+# pattern and untagged images
+#   $ dkcleanup --purge {image}
+# Remove everything
+#   $ dkcleanup --nuclear
+
+echo -e "\n WELCOME TO DOCKER CLEANUP SCRIPT \n" 
+echo -e "\n Your script is about to start, please wait ... \n"
+sleep 3
+
+if [ "$1" == "--reset" ]; then
+    # Remove all containers regardless of state
+    docker rm -vf $(docker ps -a -q) 2>/dev/null || echo -e "\n No more containers to remove.\n"
+elif [ "$1" == "--purge" ]; then
+    # Attempt to remove running containers that are using the images we're trying to purge first.
+    (docker rm -vf $(docker ps -a | grep "$2/\|/$2 \| $2 \|:$2\|$2-\|$2:\|$2_" | awk '{print $1}') 2>/dev/null || echo -e "\n No containers using the \"$2\" image, continuing purge.\n") &&\
+    # Remove all images matching arg given after "--purge"
+    docker rmi $(docker images | grep "$2/\|/$2 \| $2 \|$2 \|$2-\|$2_" | awk '{print $3}') 2>/dev/null || echo -e "\n No images matching \"$2\" to purge.\n"
+else
+    # This alternate only removes "stopped" containers
+    docker rm -vf $(docker ps -a | grep "Exited" | awk '{print $1}') 2>/dev/null || echo -e  "\n No stopped containers to remove.\n"
+fi
+
+if [ "$1" == "--nuclear" ]; then
+    docker rm -vf $(docker ps -a -q) 2>/dev/null || echo -e "\n No more containers to remove.\n"
+    docker rmi $(docker images -q) 2>/dev/null || echo -e "\n No more images to remove.\n"
+else
+    # Always remove untagged images
+    docker rmi $(docker images | grep "<none>" | awk '{print $3}') 2>/dev/null || echo -e "\n No untagged images to delete.\n"
+fi
+
+echo -e "\n Deleting ... \n" 
+for pc in $(seq 1 100); do
+    echo -ne "$pc%\033[0K\r"
+    sleep 0.03
+done
+exit 0
+
